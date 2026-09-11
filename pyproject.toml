@@ -1,0 +1,14 @@
+[project]
+name = "lastknowngood"
+version = "0.1.0"
+description = "A recovery drill harness that measures your real RTO and proves backup immutability by attacking it - in a sealed lab."
+requires-python = ">=3.11"
+dependencies = []
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
