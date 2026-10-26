@@ -1,6 +1,6 @@
 """The drill orchestrator: measure the recovery objectives you claim to have.
 
-THE DIFFERENTIATOR LIVES HERE.
+This is the core of the project.
 
 Every organisation has a four-hour RTO in a document. Almost none has restored
 under realistic conditions, so the first real attempt is also the first test,

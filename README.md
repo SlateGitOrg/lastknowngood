@@ -1,140 +1,112 @@
 # lastknowngood
 
-> A recovery drill harness that measures your real RTO and proves backup immutability by attacking it - in a sealed lab.
+A recovery drill harness that measures your real RTO and proves backup immutability by attacking the backups, inside a sealed in-process lab.
 
-`FLAGSHIP` · **Cybersecurity** · Expert · ~5-6 weeks · Manufacturing - plant floor with OT/IT convergence
+[![ci](https://github.com/SlateGitOrg/lastknowngood/actions/workflows/ci.yml/badge.svg)](https://github.com/SlateGitOrg/lastknowngood/actions/workflows/ci.yml)
 
-**Primary language:** Go
-**Tags:** `resilience`, `backup`, `incident-response`, `chaos`, `object-lock`, `measurement`
+## Why
 
----
+Every organisation claims a four-hour recovery objective. Almost none has restored under realistic conditions, so the first real attempt is also the first test, and it tends to reveal that the backups were encrypted too, that the restore takes far longer than planned, or that the credentials needed to start a service live in the service that is down. A recovery plan is fiction until it has been run. lastknowngood runs it: it executes a scripted restore with per-phase timing, measures the achieved RPO, and checks immutability by trying to delete and overwrite the backup instead of reading a configuration flag.
 
-> **Implementation note.** The catalogue specifies **Go** for this
-> project and that remains the target. This repository ships a runnable
-> **Python** reference implementation of the core differentiator so the
-> behaviour is executable and tested today; port it to Go as step one
-> of your own build.
+## Features
 
-## The problem
+- **Drill orchestrator** that executes a full restore with wall-clock cost per phase and reports the delta against the claimed RTO.
+- **Immutability prober** that attempts deletion and overwrite of every backup and compares the result with what the configuration claims.
+- **Achieved-RPO measurement** from the gap between the chosen backup and the event, plus the number of records that existed before the event but are missing from the backup.
+- **Dependency-order discovery**: stores restore in dependency order, and a credential cycle (store A needs a secret held in store B and vice versa) is detected, charged as a break-glass scramble, and named in the report.
+- **Phase-by-phase Gantt** of the drill, with start and end offsets.
+- **Attack on the backups**: the simulated encryption event also corrupts any backup whose lock is not actually enforced, because real ransomware goes for backups first.
 
-Every organisation claims a four-hour recovery objective. Almost none has restored under realistic conditions, and the first real attempt reveals that the backups were encrypted too, or the restore takes forty hours, or nobody can find the credentials because they lived in the system that is down. The recovery plan is fiction until it has been run, and the pager is the worst time to discover that.
+## Architecture
 
-## ⭐ The differentiator
-
-**Empirically measures RPO and RTO by executing scripted restore drills**, and independently scores backup immutability by *attempting* deletion and modification with the production service account - proving immutability rather than reading a configuration flag. A generic backup project writes a runbook. This one produces a measured number that contradicts the runbook, which is the entire value.
-
-This is the sentence to lead with when someone asks you to walk through the
-project. Everything else in this repo exists to make it true and to prove it.
-
-## Data
-
-A fully self-contained lab: a Docker Compose estate (application database, file share, config store) with a synthetic data generator and a **simulated** encryption event confined to the compose network. The 'ransomware' is a documented file-rewriting script that is lab-scoped by construction - it has no network reach, no propagation, and no capability outside the compose project.
-
-> No paid API key is required to run or demo this project. Where a paid
-> service would add value it is wired as an optional enhancement behind an
-> interface with an offline mock as the default implementation.
-
-## Stack
-
-- Go for the drill orchestrator
-- Docker Compose lab estate
-- MinIO with object lock; Restic for backups
-- PostgreSQL point-in-time recovery
-- Prometheus for instrumentation
-- CI
-
-## Core capabilities
-
-- Drill orchestrator executing a full restore with wall-clock instrumentation per phase
-- Immutability prober attempting deletion and overwrite with production-equivalent credentials
-- Achieved-RPO measurement by diffing restored data against the pre-event snapshot
-- Dependency-order discovery identifying which service could not start and exactly why
-- Drill report with a phase-by-phase Gantt and the delta against the claimed RTO
-
-## Repository layout
-
-```
-cmd/drill/
-internal/orchestrate/
-internal/probe/
-internal/measure/
-lab/                      # sealed compose estate + scenario scripts
-reports/
-docs/
+```mermaid
+flowchart LR
+  A["Estate<br/>(stores + backups)"] --> B["Simulated encryption event"]
+  A --> C["Immutability prober<br/>(delete + overwrite attempts)"]
+  B --> D["Drill orchestrator"]
+  C --> D
+  D --> E["Dependency-ordered restore<br/>(credential cycle detection)"]
+  E --> F["DrillReport<br/>(phases, RTO, RPO, probes)"]
+  F --> G["Demo output<br/>(Gantt + verdict)"]
 ```
 
-## Build plan
+`src/lab.py` holds the estate: stores of records, point-in-time backups with an `object_lock` claim and a separate `lock_enforced` reality, the simulated encryption event, and the prober. `src/drill.py` runs the drill: probe the backups, pick the newest usable one, restore stores in dependency order, and compute the report. `src/demo.py` runs three drills and prints the results. Everything runs in memory on the standard library.
 
-1. Build the lab and the data generator. Take a known-good snapshot - it is the reference for every RPO measurement.
-2. Instrument the restore path before optimising it. The first honest number is the point of the project.
-3. Immutability prober next, including the negative case: deliberately misconfigure object lock and confirm the prober reports failure.
-4. Dependency-order discovery last; it is where the surprising findings come from.
+## Quick start
 
-## Testing strategy
-
-Assert measured RPO equals the known injected data-loss window to within one write. Assert the immutability prober correctly reports **failure** when object lock is deliberately misconfigured - a prober that always says 'immutable' passes a naive test and is worse than useless.
-
-Tests assert **correctness**, not merely that the code runs. A green suite on
-this repo is a claim about behaviour under adversarial conditions; treat any
-test that would pass against a deliberately broken implementation as a bug in
-the test.
-
-## Quality & safety layer
-
-The simulated encryption event is confined to the compose network by construction and documented as such in docs/threat-model.md. There is no propagation logic, no network discovery, and no capability outside the lab. This is a resilience-measurement tool, not malware.
-
-## Measurable outcome
-
-> Claimed RTO four hours; measured RTO eleven hours twenty minutes, six of which trace to a credential dependency nobody had documented. After the fix, the repeat drill measured three hours five minutes.
-
-State it in these terms — business units, not technical ones — in your CV
-bullet and in the first thirty seconds of describing the project.
-
-## Interview questions this project answers
-
-- **What is your real RTO, and how do you know?**
-- **How do you prove a backup is immutable?**
-- **What dependency will stop your restore, and have you tested it?**
-
-## What this deliberately is *not*
-
-- Not offensive tooling, and not generalisable to any system outside the lab.
-- Not a backup product. It measures the one you have.
-
-
-## Run it now
+Requires Python 3.11 or newer. There are no dependencies to install.
 
 ```bash
-python -m unittest discover -s tests -v   # the suite
-python -m src.demo                        # the 60-second artefact
-```
-
-Requires Python 3.11+. The runnable core uses **only the standard
-library** (including `sqlite3`), so there is nothing to install.
-
-## Getting started
-
-```bash
-git clone <your-fork-url> lastknowngood
+git clone https://github.com/SlateGitOrg/lastknowngood.git
 cd lastknowngood
-make lab-up                   # sealed estate
-make seed                     # synthetic data + known-good snapshot
-make drill                    # scripted event + full restore, instrumented
-make probe-immutability
-cat reports/latest.md
+python -m unittest discover -s tests -v   # run the tests
+python -m src.demo                        # run three drills and print the report
 ```
 
-Docker is supported but optional — every path above works on a plain
-Windows/macOS/Linux laptop without a cloud account.
+## Example
 
-## Definition of done
+`python -m src.demo` runs three drills against the same four-store estate (vault, app_db, file_share, config). Trimmed output:
 
-- [ ] The differentiator above is implemented, and a test proves it
-- [ ] The measurable outcome is produced by a command anyone can run
-- [ ] `README` explains the one decision a generic version gets wrong
-- [ ] CI runs the full suite on every push and is green on `main`
-- [ ] A recruiter can see the headline artefact in under 60 seconds
+```text
+  DRILL 1 - as the runbook describes it
+    immutability probe: claims=True  actual=ENFORCED
+    resolve_credentials          1h 55m   7h 55m
+    claimed RTO   4h 00m
+    measured RTO  10h 00m   <- MISSED
+    achieved RPO  0h 57m (12 records lost)
 
-## Licence
+  DRILL 2 - after breaking the credential cycle
+    claimed RTO   4h 00m
+    measured RTO  4h 00m   <- MET
+
+  DRILL 3 - object lock configured but not enforced
+    immutability probe: claims=True  actual=NOT ENFORCED   <- claim does not match reality
+    RECOVERY FAILED: no usable backup: every copy was reachable from the compromised credentials
+```
+
+Drill 1 shows six hours lost to a credential dependency nobody had documented. Drill 2 shows the same estate once the cycle is broken. Drill 3 shows a lock that is claimed but not enforced: the probe deletes the backup, and the drill cannot recover.
+
+## How it works
+
+- **Phase costs are explicit.** `PHASE_COSTS` in `src/drill.py` lists the simulated duration of each phase (declare incident, locate backup, provision infrastructure, restore per store, verify, cutover), and `CREDENTIAL_SCRAMBLE_SECONDS` sets the cost of resolving a credential deadlock. They are assumptions you can change; the measured RTO is the sum of the phases that actually ran.
+- **Probe before relying.** The drill probes every backup first. A drill that assumes the backups are good only measures the happy path.
+- **Immutability is attempted, not read.** The prober tries to delete and overwrite each backup and records whether each attempt was blocked. `claim_matches_reality` is false when the configuration says immutable and the attempt succeeds.
+- **Restore ordering.** Each pass restores every store whose `depends_on` stores and credential source are already restored. If a pass makes no progress, the drill records a `resolve_credentials` phase for the stuck store and continues.
+- **RPO in two units.** `achieved_rpo_seconds` is the time window of lost writes; `lost_records` is the same loss in rows, which is the number a business owner can price.
+
+## Testing
+
+```bash
+python -m unittest discover -s tests -v
+```
+
+The 14 tests assert behaviour, not just execution:
+
+- measured RPO equals the known loss window, and writes after the backup count as lost;
+- a genuinely locked backup survives the probe, a misconfigured lock is reported as false, and an unlocked backup is reported honestly;
+- the encryption event destroys unprotected backups, a locked backup survives, and restored data is the pre-event data;
+- restores respect dependency order, a credential dependency adds measurable time, and a true deadlock is measured rather than hidden;
+- the measured RTO can exceed the claimed one, and the Gantt accounts for the whole window.
+
+## Project layout
+
+```text
+src/
+  lab.py     # estate, stores, backups, simulated encryption event, immutability prober
+  drill.py   # drill orchestrator, phase model, DrillReport
+  demo.py    # three-drill demonstration
+tests/
+  test_drill.py
+docs/
+  ARCHITECTURE.md
+```
+
+## Limitations
+
+- The lab is an in-memory simulation. There is no real object store, database or restore; phase durations are configured costs, not measurements of real systems.
+- The simulated encryption event overwrites dictionary entries inside the process. It has no filesystem or network access and no propagation logic. This is a resilience-measurement tool, not malware, and it does not apply to any system outside the lab.
+- The prober models immutability as two booleans (`object_lock`, `lock_enforced`). Real object-lock semantics (retention modes, legal holds, bucket versus object scope) are out of scope.
+
+## License
 
 MIT — see [LICENSE](LICENSE).
