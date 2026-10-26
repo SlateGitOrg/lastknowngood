@@ -31,7 +31,7 @@ flowchart LR
 
 ## Key decisions
 
-- **Probe instead of read.** Backup immutability is established by attempting deletion and overwrite. Reading a flag reports intent; the attempt reports behaviour. The cost is that the probe is destructive when the lock is not enforced, which is the finding.
+- **Probe instead of read.** Backup immutability is established by attempting deletion and overwrite. Reading a flag reports intent; the attempt reports behaviour. The cost is that the probe is destructive when the lock is not enforced, which is the intended result.
 - **Attack the backups.** The simulated event corrupts any backup whose lock is not enforced. A drill that leaves backups untouched measures the easy case.
 - **Explicit phase costs.** Durations live in one table (`PHASE_COSTS`) so every assumption is visible and adjustable. The trade-off is that the RTO is a model of the process, not a stopwatch on real infrastructure.
 - **Credential cycles are first-class.** A store that needs a credential from a store that is itself down is the most common reason a paper recovery overruns. The drill detects the stall and charges a break-glass phase instead of failing silently.

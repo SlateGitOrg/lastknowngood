@@ -9,8 +9,8 @@ and it is conducted at 3am by people who have never done it.
 This module does not write a runbook. It executes the restore with wall-clock
 instrumentation per phase, measures the ACHIEVED RPO by diffing restored data
 against the pre-event snapshot, and discovers dependency-ordering failures by
-actually hitting them. The output is a number that usually contradicts the
-document, and that contradiction is the deliverable.
+actually hitting them. The output is a number that usually differs from the
+document.
 """
 
 from __future__ import annotations
@@ -20,8 +20,8 @@ from dataclasses import dataclass, field
 from .lab import Backup, Estate, ProbeResult, probe_immutability
 
 # Phase costs in seconds. Deliberately explicit and configurable rather than
-# buried: every one of these is an assumption a reviewer should be able to
-# challenge, and "where did 11 hours come from" is the first question asked.
+# buried: every one of these is an assumption you may want to
+# change, and "where did 11 hours come from" is the first question asked.
 PHASE_COSTS = {
     "declare_incident": 900,
     "locate_backup": 600,

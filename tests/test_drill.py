@@ -4,7 +4,7 @@ The two assertions that matter:
   1. measured RPO equals the KNOWN injected loss window, to the record;
   2. the immutability prober reports FAILURE when the lock is misconfigured.
 
-(2) is the one people skip. A prober that always returns "immutable: true"
+(2) matters because a prober that always returns "immutable: true"
 passes every naive test and is worse than not having one, because it converts
 an unknown into a false assurance.
 """
@@ -96,7 +96,7 @@ class TestImmutabilityProber(unittest.TestCase):
         self.assertTrue(result.claim_matches_reality)
         self.assertFalse(backup.deleted)
 
-    def test_THE_TEST_PEOPLE_SKIP_a_misconfigured_lock_is_reported_as_false(self):
+    def test_misconfigured_lock_is_reported_as_false(self):
         # The setting says immutable. It is not enforced. A prober that reads
         # the config reports "immutable: true" and the organisation finds out
         # during the incident.
@@ -173,7 +173,7 @@ class TestDependencyDiscovery(unittest.TestCase):
         order = [p.detail for p in report.phases if p.name == "restore_store"]
         self.assertLess(order.index("app_db"), order.index("file_share"))
 
-    def test_THE_FINDING_a_credential_dependency_adds_hours_nobody_planned(self):
+    def test_credential_dependency_adds_unplanned_hours(self):
         # app_db needs a credential from vault, and this is only discovered by
         # attempting the restore in the order the runbook implies.
         estate = build_estate(credential_trap=True)

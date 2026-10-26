@@ -77,8 +77,8 @@ def main() -> None:
 
     drill("DRILL 1 - as the runbook describes it", credential_trap=True,
           lock_enforced=True)
-    print("\n    Finding: app_db needs a credential held in vault, and vault")
-    print("    needs one held in app_db. Nobody had documented this, because")
+    print("\n    Result: app_db needs a credential held in vault, and vault")
+    print("    needs one held in app_db. This dependency is not in the runbook, because")
     print("    on paper each store restores independently.")
 
     drill("DRILL 2 - after breaking the credential cycle", credential_trap=False,
